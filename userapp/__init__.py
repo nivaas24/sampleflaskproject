@@ -25,7 +25,7 @@ JWT_ALGORITHM = flask_config['jwt_algorithm']
 
 # create Flask app and load configs
 app = Flask(__name__)
-app.config['DEBUG'] = FLASK_DEBUG_MODE
+app.config['DEBUG'] = False
 app.config['MONGO_URI'] = DB_URI
 
 
