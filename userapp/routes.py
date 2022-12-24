@@ -8,6 +8,18 @@ failure_response = {"responseCode": 404, "responseMessage": "Failed"}
 
 @app.route("/register", methods=['POST'])
 def user_registration():
+    """
+    View function to register a new user, this endpoint validates the first name, last name and email with
+    existing user records and inserts new user record, password will be hashed before storing in db
+
+    Request Body:
+     - first_name
+     - last_name
+     - email
+     - password
+
+    :return: JSON response
+    """
     user_data = request.get_json()
     response = failure_response
     try:
@@ -16,14 +28,19 @@ def user_registration():
             response = success_response
         response['responseData'] = registration_status
     except Exception:
-        import traceback
-        print(traceback.format_exc())
         response['responseData'] = "Unable to Process the Request"
     return jsonify(response)
 
 
 @app.route("/login", methods=['POST'])
 def user_login():
+    """
+    View function for user login, this endpoint authenticates the user and generates a JWT token
+    Request Body:
+     - email
+     - password
+    :return: JSON response with status message and Bearer token
+    """
     user_data = request.get_json()
     response = failure_response
     try:
@@ -33,8 +50,6 @@ def user_login():
         response['responseData'] = login_status
         response['AuthorizationToken'] = utils.generate_jwt_token(jwt_payload)
     except Exception:
-        import traceback
-        print(traceback.format_exc())
         response['responseData'] = "Unable to Process the Request"
     return jsonify(response)
 
@@ -42,11 +57,22 @@ def user_login():
 @app.route("/template", methods=['GET', 'POST'])
 @utils.validate_authorization_header
 def process_templates():
+    """
+    view function to get all templates and insert new templates, this function is wrapped by
+    validate_authorization_header which validates the Bearer token from 'request.headers.Authorization' token from any
+    registered user will pass the validation to get all templates and insert new templates.
+    Request Body:
+     - template_name
+     - subject
+     - body
+    Request Header:
+     - Authorization
+    :return: response JSON with response message and data
+    """
     response = failure_response
     if request.method == 'GET':
         try:
             templates = db.fetch_all_templates()
-            print('templates', templates)
             response = success_response
             if len(templates) == 0:
                 response['response_data'] = "No Templates Found"
@@ -57,11 +83,15 @@ def process_templates():
     if request.method == 'POST':
         try:
             template_insert_data = request.get_json()
-            template_insert_status = db.insert_template(template_insert_data)
+            jwt_token = request.headers.get('Authorization')
+            user_email = utils.decode_jwt_token(jwt_token).get('email')
+            template_insert_status = db.insert_template(template_insert_data, user_email)
             if "success" in template_insert_status:
                 response = success_response
             response['responseData'] = template_insert_status
         except Exception:
+            import traceback
+            print(traceback.format_exc())
             response['responseData'] = "Unable to Process the Request"
     return response
 
@@ -69,11 +99,23 @@ def process_templates():
 @app.route("/template/<template_id>", methods=['GET', 'PUT', 'DELETE'])
 @utils.validate_authorization_header
 def process_templates_by_id(template_id):
+    """
+    vew function to get, update and delete templates by template id, this function is wrapped by
+    validate_authorization_header which validates the Bearer token from 'request.headers.Authorization' token from any
+    registered user which will pass the validation to get template by template id and only allow the owner of template
+    the update and delete template.
+    Request Body:(for update only)
+      - template_name
+      - subject
+      - body
+    Request Header:
+      - Authorization
+    :return: response JSON with response message and data
+    """
     response = failure_response
     response_data = None
     if request.method == 'GET':
         try:
-            print(template_id)
             template = db.fetch_template_by_id(template_id)
             response = success_response
             if len(template) == 0:
@@ -83,11 +125,12 @@ def process_templates_by_id(template_id):
                 del template['_id']
                 response_data = template
         except Exception:
+            import traceback
+            print(traceback.format_exc())
             response_data = "Unable to fetch template {}".format(template_id)
 
     if request.method == "PUT":
         try:
-            print(template_id)
             template_update_data = request.get_json()
             result = db.update_template_by_id(template_id, template_update_data)
             if result is None:
@@ -96,11 +139,12 @@ def process_templates_by_id(template_id):
                 response = success_response
                 response_data = result
         except Exception:
+            import traceback
+            print(traceback.format_exc())
             response_data = "Unable to update template {}". format(template_id)
 
     if request.method == "DELETE":
         try:
-            print(template_id)
             result = db.delete_template_by_id(template_id)
             if result is None:
                 response_data = "Template ID: {} not found".format(template_id)
