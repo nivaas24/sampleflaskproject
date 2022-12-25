@@ -80,6 +80,7 @@ def process_templates():
                 response['response_data'] = templates
         except Exception:
             response['response_data'] = "Unable to fetch templates"
+        return response
     if request.method == 'POST':
         try:
             template_insert_data = request.get_json()
@@ -93,7 +94,7 @@ def process_templates():
             import traceback
             print(traceback.format_exc())
             response['responseData'] = "Unable to Process the Request"
-    return response
+        return response
 
 
 @app.route("/template/<template_id>", methods=['GET', 'PUT', 'DELETE'])
