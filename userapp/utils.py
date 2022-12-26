@@ -54,15 +54,18 @@ def validate_authorization_header(func):
             if func.__name__ == "process_templates_by_id" and request.method in ['PUT', 'DELETE']:
                 if kwargs['template_id'] in user_data[0].get('templates'):
                     response = func(*args, **kwargs)
+                    return response
                 else:
                     response = {
                         "responseCode": 401, "responseMessage": "AccessDenied",
                         "responseData": "User does not have permission to update or delete template"
                     }
+                    return jsonify(response)
             else:
                 response = func(*args, **kwargs)
+                return response
         else:
             response = {"responseCode": 401, "responseMessage": "UnAuthorized User"}
-        return jsonify(response)
+            return jsonify(response)
     decorator.__name__ = func.__name__
     return decorator

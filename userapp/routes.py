@@ -46,9 +46,9 @@ def user_login():
     try:
         login_status, jwt_payload = db.validate_login(user_data)
         if "Login Success" in login_status:
-            response = success_response
-        response['responseData'] = login_status
-        response['AuthorizationToken'] = utils.generate_jwt_token(jwt_payload)
+            response = {"responseCode": 200, "responseMessage": "Success"}
+            response['responseData'] = login_status
+            response['AuthorizationToken'] = utils.generate_jwt_token(jwt_payload)
     except Exception:
         response['responseData'] = "Unable to Process the Request"
     return jsonify(response)
@@ -75,12 +75,12 @@ def process_templates():
             templates = db.fetch_all_templates()
             response = success_response
             if len(templates) == 0:
-                response['response_data'] = "No Templates Found"
+                response['responseData'] = "No Templates Found"
             else:
-                response['response_data'] = templates
+                response['responseData'] = templates
         except Exception:
-            response['response_data'] = "Unable to fetch templates"
-        return response
+            response['responseData'] = "Unable to fetch templates"
+        return jsonify(response)
     if request.method == 'POST':
         try:
             template_insert_data = request.get_json()
@@ -94,7 +94,7 @@ def process_templates():
             import traceback
             print(traceback.format_exc())
             response['responseData'] = "Unable to Process the Request"
-        return response
+        return jsonify(response)
 
 
 @app.route("/template/<template_id>", methods=['GET', 'PUT', 'DELETE'])
@@ -114,45 +114,46 @@ def process_templates_by_id(template_id):
     :return: response JSON with response message and data
     """
     response = failure_response
-    response_data = None
     if request.method == 'GET':
         try:
             template = db.fetch_template_by_id(template_id)
             response = success_response
             if len(template) == 0:
-                response_data = "Template ID: {} not found".format(template_id)
+                response['responseData'] = "Template ID: {} not found".format(template_id)
             else:
                 template['template_id'] = template['_id']
                 del template['_id']
-                response_data = template
+                response['responseData'] = template
         except Exception:
             import traceback
             print(traceback.format_exc())
-            response_data = "Unable to fetch template {}".format(template_id)
+            response['responseData'] = "Unable to fetch template {}".format(template_id)
+        return jsonify(response)
 
     if request.method == "PUT":
         try:
             template_update_data = request.get_json()
             result = db.update_template_by_id(template_id, template_update_data)
+            response = success_response
             if result is None:
-                response_data = "Template ID: {} not found".format(template_id)
+                response['responseData'] = "Template ID: {} not found".format(template_id)
             else:
-                response = success_response
-                response_data = result
+                response['responseData'] = result
         except Exception:
             import traceback
             print(traceback.format_exc())
-            response_data = "Unable to update template {}". format(template_id)
+            response['responseData'] = "Unable to update template {}". format(template_id)
+        return jsonify(response)
 
     if request.method == "DELETE":
         try:
             result = db.delete_template_by_id(template_id)
+            response = success_response
             if result is None:
-                response_data = "Template ID: {} not found".format(template_id)
+                response['responseData'] = "Template ID: {} not found".format(template_id)
             else:
                 response = success_response
-                response_data = result
+                response['responseData'] = result
         except Exception:
-            response_data = "Unable to update template {}". format(template_id)
-    response['responseData'] = response_data
-    return response
+            response['responseData'] = "Unable to update template {}". format(template_id)
+        return jsonify(response)
