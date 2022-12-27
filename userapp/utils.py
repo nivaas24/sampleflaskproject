@@ -54,8 +54,10 @@ def validate_authorization_header(func):
                 if func.__name__ == "process_templates_by_id" and \
                         kwargs['template_id'] in user_data[0].get('templates'):
                     return True
-                elif func.__name__ == "process_templates" and request.method == 'GET':
-                    if permissions.get('ViewTemplates') == 'Y':
+                elif func.__name__ == "process_templates":
+                    if request.method == 'GET' and permissions.get('ViewTemplates') == 'Y':
+                        return True
+                    if request.method == 'POST':
                         return True
                 else:
                     return False
