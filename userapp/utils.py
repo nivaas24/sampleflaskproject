@@ -1,3 +1,4 @@
+import copy
 import jwt
 from userapp import JWT_SECRET, JWT_ALGORITHM, db
 from flask import request, jsonify
@@ -36,36 +37,40 @@ def validate_authorization_header(func):
     :return: JSON response
     """
     def decorator(*args, **kwargs):
-        encoded_jwt_token = request.headers.get('Authorization')
-        if encoded_jwt_token is None:
-            response = {
-                "responseCode": 401, "responseMessage": "AccessDenied",
-                "responseData": "Please provide Authorization token "
+        access_denied_response = {"responseCode": 401, "responseMessage": "Access Denied"}
+
+        def validate_user_permissions(token):
+            token = token.split(" ")[1]
+            decoded_token = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM, ])
+            decoded_token = {
+                key: value for key, value in decoded_token.items()
+                if key in ['first_name', 'last_name', 'email', 'permissions']
             }
-            return jsonify(response)
-        else:
-            encoded_jwt_token = encoded_jwt_token.split(" ")[1]
-        decoded_token = jwt.decode(encoded_jwt_token, JWT_SECRET, algorithms=[JWT_ALGORITHM,])
-        decoded_token = {
-            key: value for key, value in decoded_token.items() if key in ['first_name', 'last_name', 'email']
-        }
-        user_data = db.fetch_user_data_by_email_name(decoded_token)
-        if len(user_data) == 1:
-            if func.__name__ == "process_templates_by_id" and request.method in ['PUT', 'DELETE']:
-                if kwargs['template_id'] in user_data[0].get('templates'):
-                    response = func(*args, **kwargs)
-                    return response
+            permissions = decoded_token.pop('permissions')
+
+            user_data = db.fetch_user_data_by_email_name(decoded_token)
+
+            if len(user_data) == 1:
+                if func.__name__ == "process_templates_by_id" and \
+                        kwargs['template_id'] in user_data[0].get('templates'):
+                    return True
+                elif func.__name__ == "process_templates" and request.method == 'GET':
+                    if permissions.get('ViewTemplates') == 'Y':
+                        return True
                 else:
-                    response = {
-                        "responseCode": 401, "responseMessage": "AccessDenied",
-                        "responseData": "User does not have permission to update or delete template"
-                    }
-                    return jsonify(response)
-            else:
-                response = func(*args, **kwargs)
-                return response
-        else:
-            response = {"responseCode": 401, "responseMessage": "UnAuthorized User"}
+                    return False
+
+        encoded_jwt_token = request.headers.get('Authorization')
+
+        if encoded_jwt_token is None:
+            response = copy.deepcopy(access_denied_response)
+            response["responseData"] = "Please provide Authorization token "
             return jsonify(response)
+
+        if validate_user_permissions(encoded_jwt_token):
+            return func(*args, **kwargs)
+
+        return jsonify(access_denied_response)
+
     decorator.__name__ = func.__name__
     return decorator

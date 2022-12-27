@@ -40,7 +40,8 @@ def validate_login(user_data):
         response = "Invalid Credentials"
     else:
         response = "Login Success, Welcome {0}, {1}".format(user_result['first_name'], user_result['last_name'])
-        jwt_payload = {key: value for key, value in user_result.items() if key in ['first_name', 'last_name', 'email']}
+        jwt_payload = {key: value for key, value in user_result.items()
+                       if key in ['first_name', 'last_name', 'email', 'permissions']}
     return response, jwt_payload
 
 
@@ -67,26 +68,24 @@ def fetch_template_by_id(template_id):
         return template
     else:
         template = template[0]
-    user = list(mongo.db.users.find({"templates": {'$eq': template_id}}, {'first_name': 1, 'last_name': 1, '_id': 0}))
-    first_name = user[0]['first_name']
-    last_name = user[0]['last_name']
-    template['created_by'] = first_name + ", " + last_name
     return template
 
 
-def insert_template(template_insert_data, user_email):
+def insert_template(template_insert_data, user_data):
     """
     DB function to insert template data in templates collection and add template id to templates array in users
     collection
     :param template_insert_data:
-    :param user_email
+    :param user_data
     :return: status message
     """
     try:
+        user_email = user_data.get('email')
+        user_name = "{0} {1}".format(user_data.get('first_name'), user_data.get('last_name'))
         latest_template_id = list(mongo.db.templates.find({}, {"_id": 1}).sort([('_id', -1)]).limit(1))[0]['_id']
         latest_template_id = int(latest_template_id) + 1
         template_insert_data['_id'] = str(latest_template_id)
-        print(template_insert_data)
+        template_insert_data['created_user'] = user_name
         mongo.db.templates.insert_one(template_insert_data)
         mongo.db.users.update_one({"email": user_email}, {"$push": {"templates": str(latest_template_id)}})
         insert_status = "Template Id: {} inserted successfully".format(latest_template_id)
@@ -112,7 +111,7 @@ def update_template_by_id(template_id, template_data):
     return "Template Id: {} Updated successfully".format(template_id)
 
 
-def delete_template_by_id(template_id):
+def delete_template_by_id(template_id, user_email):
     """
     DB function to delete template by template ID
     :param template_id:
@@ -120,6 +119,7 @@ def delete_template_by_id(template_id):
     """
     template_filter = {"_id": template_id}
     mongo.db.templates.delete_many(template_filter)
+    mongo.db.users.update_one({"email": user_email}, {"$pull": {"templates": template_id}})
     return "Template Id: {} Deleted successfully".format(template_id)
 
 
@@ -133,6 +133,6 @@ def fetch_user_data_by_email_name(filter_payload):
     return result
 
 
-
-
-
+def update_permission(email, permission):
+    mongo.db.users.update_one({"email": email}, {'$set': {'permissions.ViewTemplates': permission}})
+    return 'User permission updated successfully'
